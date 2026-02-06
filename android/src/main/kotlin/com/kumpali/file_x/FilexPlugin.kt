@@ -288,17 +288,17 @@ class FilexPlugin :
                 val uriStr = call.argument<String>("uri")
                 val mime = call.argument<String>("mime") ?: "*/*"
 
-// ─────────────────────────────────────────────
-// Guard: single in-flight SAF picker only
-// ─────────────────────────────────────────────
+                // ─────────────────────────────────────────────
+                // Guard: single in-flight SAF picker only
+                // ─────────────────────────────────────────────
                 if (pendingResult != null) {
                     result.error("BUSY", "Another file operation in progress", null)
                     return
                 }
 
-// ─────────────────────────────────────────────
-// Guard: mutually exclusive inputs
-// ─────────────────────────────────────────────
+                // ─────────────────────────────────────────────
+                // Guard: mutually exclusive inputs
+                // ─────────────────────────────────────────────
                 if (path != null && uriStr != null) {
                     result.error(
                         "INVALID_ARGS",
@@ -308,9 +308,9 @@ class FilexPlugin :
                     return
                 }
 
-// ─────────────────────────────────────────────
-// MODE 1: PATH IS AUTHORITATIVE
-// ─────────────────────────────────────────────
+                // ─────────────────────────────────────────────
+                // MODE 1: PATH IS AUTHORITATIVE
+                // ─────────────────────────────────────────────
                 if (path != null) {
                     val file = File(path)
 
@@ -345,18 +345,18 @@ class FilexPlugin :
                     }
                 }
 
-// ─────────────────────────────────────────────
-// MODE 2: DIRECT URI (already trusted / SAF)
-// ─────────────────────────────────────────────
+                // ─────────────────────────────────────────────
+                // MODE 2: DIRECT URI (already trusted / SAF)
+                // ─────────────────────────────────────────────
                 if (uriStr != null) {
                     openUri(uriStr.toUri(), mime, result)
                     return
                 }
 
-// ─────────────────────────────────────────────
-// MODE 3: EXPLICIT USER-MEDIATED PICKER
-// (only reached if Flutter provided neither)
-// ─────────────────────────────────────────────
+                // ─────────────────────────────────────────────
+                // MODE 3: EXPLICIT USER-MEDIATED PICKER
+                // (only reached if Flutter provided neither)
+                // ─────────────────────────────────────────────
                 launchSaf(mime, result)
 
             }
