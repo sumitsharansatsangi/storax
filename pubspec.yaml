@@ -1,7 +1,14 @@
 name: file_x
-description: "A new Flutter plugin project."
+description: "A Flutter plugin for Android-focused file management."
 version: 0.0.1
-homepage:
+homepage: https://github.com/sumitsharansatsangi/file_x
+
+topics: 
+  - file_x
+  - storage
+  - android
+  - file_manager
+  - file_explorer
 
 environment:
   sdk: ^3.10.8
