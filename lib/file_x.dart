@@ -141,6 +141,26 @@ class FileX {
     return FileXPlatform.instance.permissionHealthCheck();
   }
 
+  /// Opens a file for reading.
+  ///
+  /// [path] can be:
+  /// - A native filesystem path (e.g. `/storage/emulated/0/Download/file.txt`)
+  /// - A SAF URI (`content://…`)
+  /// - A file:// URI
+  ///
+  /// [mime] is optional and may be used to override the detected MIME type.
+  Future<void> openFile({
+    String? path,
+    String? mime,
+    String? uri,
+  }) {
+    return FileXPlatform.instance.openFile(
+      path: path,
+      mime: mime,
+      uri: uri,
+    );
+  }
+
    String formatBytes(int bytes) {
     const units = ['B', 'KB', 'MB', 'GB', 'TB'];
     double size = bytes.toDouble();

@@ -29,16 +29,72 @@ class RootsPage extends StatefulWidget {
   State<RootsPage> createState() => _RootsPageState();
 }
 
-class _RootsPageState extends State<RootsPage> {
+class _RootsPageState extends State<RootsPage> with WidgetsBindingObserver {
   final fileX = FileX();
-  late Future<List<Map<String, dynamic>>> rootsFuture;
+  List<Map<String, dynamic>> roots = [];
+  bool loading = true;
 
- 
+  Future<void> ensureStoragePermission(
+    FileX fileX,
+    BuildContext context,
+  ) async {
+    final hasAccess = await fileX.hasAllFilesAccess();
+
+    if (hasAccess == true) return;
+
+    // Android 11+ All Files Access dialog
+    await fileX.requestAllFilesAccess();
+    if (context.mounted) {
+      // Tell user what to do
+      await showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Permission required'),
+          content: const Text(
+            'Please allow "All files access" for this app.\n\n'
+            'After granting permission, come back to the app.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
 
   @override
   void initState() {
     super.initState();
-    rootsFuture = fileX.getAllRoots();
+    WidgetsBinding.instance.addObserver(this);
+    _init();
+  }
+
+  Future<void> _init() async {
+    await ensureStoragePermission(fileX, context);
+
+    final data = await fileX.getAllRoots();
+
+    if (!mounted) return;
+    setState(() {
+      roots = data;
+      loading = false;
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _init();
+    }
   }
 
   @override
@@ -52,56 +108,50 @@ class _RootsPageState extends State<RootsPage> {
             tooltip: 'Pick SAF folder',
             onPressed: () async {
               await fileX.openSafFolderPicker();
+              final allRoots = await fileX.getAllRoots();
               setState(() {
-                rootsFuture = fileX.getAllRoots();
+                roots = allRoots;
               });
             },
           ),
         ],
       ),
-      body: FutureBuilder(
-        future: rootsFuture,
-        builder: (_, snapshot) {
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final roots = snapshot.data!;
-          return ListView.builder(
-            itemCount: roots.length,
-            itemBuilder: (_, i) {
-              final r = roots[i];
-              final isSaf = r['type'] == 'saf';
-              return ListTile(
-                leading: Icon(isSaf ? Icons.lock : Icons.storage),
-                title: Text(r['name'] ?? ''),
-                isThreeLine: true,
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(isSaf ? 'SAF folder' : r['path'] ?? ''),
-                    isSaf
-                        ? const Text('SAF folder')
-                        : Text(
-                            '${fileX.formatBytes(r['free'] ?? 0)} free of ${fileX.formatBytes(r['total'] ?? 0)}',
-                          ),
-                  ],
-                ),
+      body: loading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView.builder(
+              itemCount: roots.length,
+              itemBuilder: (_, i) {
+                final r = roots[i];
+                final isSaf = r['type'] == 'saf';
+                return ListTile(
+                  leading: Icon(isSaf ? Icons.lock : Icons.storage),
+                  title: Text(r['name'] ?? ''),
+                  isThreeLine: true,
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(isSaf ? 'SAF folder' : r['path'] ?? ''),
+                      isSaf
+                          ? const Text('SAF folder')
+                          : Text(
+                              '${fileX.formatBytes(r['free'] ?? 0)} free of ${fileX.formatBytes(r['total'] ?? 0)}',
+                            ),
+                    ],
+                  ),
 
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => FileBrowserPage(
-                      initialTarget: isSaf ? r['uri'] : r['path'],
-                      isSaf: isSaf,
-                      title: r['name'],
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => FileBrowserPage(
+                        initialTarget: isSaf ? r['uri'] : r['path'],
+                        isSaf: isSaf,
+                        title: r['name'],
+                      ),
                     ),
                   ),
-                ),
-              );
-            },
-          );
-        },
-      ),
+                );
+              },
+            ),
     );
   }
 }
@@ -177,6 +227,9 @@ class _FileBrowserPageState extends State<FileBrowserPage> {
     if (e['isDirectory'] == true) {
       pathStack.add(widget.isSaf ? e['uri'] : e['path']);
       _load();
+    } else {
+      debugPrint("Opening ${e['path']} with ${e['mime']}");
+      fileX.openFile(path: e['path'], mime: e['mime']);
     }
   }
 

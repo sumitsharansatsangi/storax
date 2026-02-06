@@ -145,4 +145,18 @@ abstract class FileXPlatform extends PlatformInterface {
   /// - Support logs
   /// - Play Store reviewer diagnostics
   Future<Map<String, dynamic>> permissionHealthCheck();
+
+  /// Opens a file for reading.
+  ///
+  /// [path] can be:
+  /// - A native filesystem path (e.g. `/storage/emulated/0/Download/file.txt`)
+  /// - A SAF URI (`content://…`)
+  /// - A file:// URI
+  ///
+  /// [mime] is optional and may be used to override the detected MIME type.
+  Future<void> openFile({
+    String? path,
+    String? mime,
+    String? uri,
+  });
 }

@@ -82,6 +82,11 @@ class MockFileXPlatform
   Future<Map<String, dynamic>> permissionHealthCheck() async {
     return {'allFilesAccess': true, 'sdk': 34, 'oem': 'Mock'};
   }
+  
+  @override
+  Future<void> openFile({String? path, String? mime, String? uri}) {
+    return Future.value();
+  }
 }
 
 void main() {
