@@ -1,14 +1,14 @@
-name: file_x
-description: "A Flutter plugin for Android-focused file management."
+name: storax
+description: "Android storage access for Flutter — SAF-aware, OEM-safe, and honest."
 version: 0.0.1
-homepage: https://github.com/sumitsharansatsangi/file_x
+homepage: https://github.com/sumitsharansatsangi/storax
 
 topics: 
-  - file_x
+  - storax
   - storage
   - android
-  - file_manager
-  - file_explorer
+  - file-manager
+  - file-explorer
 
 environment:
   sdk: ^3.10.8
@@ -42,8 +42,8 @@ flutter:
   plugin:
     platforms:
       android:
-        package: com.kumpali.file_x
-        pluginClass: FilexPlugin
+        package: com.kumpali.storax
+        pluginClass: StoraxPlugin
 
   # To add assets to your plugin package, add an assets section, like this:
   # assets:

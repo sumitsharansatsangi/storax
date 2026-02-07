@@ -1,4 +1,4 @@
-package com.kumpali.file_x
+package com.kumpali.storax
 
 import android.app.Activity
 import android.content.*
@@ -35,7 +35,7 @@ import android.hardware.usb.UsbManager
 private const val SAF_REQUEST_CODE = 9091
 private const val REQ_SAF_OPEN = 9001
 /**
- * FilexPlugin
+ * StoraxPlugin
  *
  * This plugin provides a complete file-management backend for Flutter,
  * supporting:
@@ -51,7 +51,7 @@ private const val REQ_SAF_OPEN = 9001
  * - SAF requires an Activity to launch system UI
  * - Permission screens require an Activity
  */
-class FilexPlugin :
+class StoraxPlugin :
     FlutterPlugin,
     MethodChannel.MethodCallHandler,
     ActivityAware,
@@ -116,7 +116,7 @@ class FilexPlugin :
      */
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         context = binding.applicationContext
-        channel = MethodChannel(binding.binaryMessenger, "file_x")
+        channel = MethodChannel(binding.binaryMessenger, "storax")
         channel.setMethodCallHandler(this)
         registerUsbReceiver()
     }
@@ -457,7 +457,7 @@ class FilexPlugin :
                 )
             )
         } catch (e: Exception) {
-            Log.e("FileX", "addRoot", e)
+            Log.e("Storax", "addRoot", e)
         }
     }
 
@@ -477,7 +477,7 @@ class FilexPlugin :
             val primary: File? = try {
                 Environment.getExternalStorageDirectory()
             } catch (e: Exception) {
-                Log.e("FileX", "getNativeRoots", e)
+                Log.e("Storax", "getNativeRoots", e)
                 null
             }
 
@@ -724,7 +724,7 @@ class FilexPlugin :
                     Intent.FLAG_GRANT_READ_URI_PERMISSION
                 )
             }catch (e: Exception) {
-                Log.e("FileX", "persistSafPermission", e)
+                Log.e("Storax", "persistSafPermission", e)
             }
         }
     }
@@ -798,7 +798,7 @@ class FilexPlugin :
 
     private val usbReceiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context, intent: Intent) {
-            Log.d("FileX_USB", "USB intent: ${intent.action}")
+            Log.d("Storax_USB", "USB intent: ${intent.action}")
             when (intent.action) {
 
                 // Filesystem-based USB (some devices)
@@ -834,7 +834,7 @@ class FilexPlugin :
 
     private fun unregisterUsbReceiver() {
         try { context.unregisterReceiver(usbReceiver) } catch (e: Exception) {
-            Log.e("FileX", "unregisterUsbReceiver", e)
+            Log.e("Storax", "unregisterUsbReceiver", e)
         }
     }
 

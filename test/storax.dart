@@ -1,14 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:file_x/file_x.dart';
-import 'package:file_x/file_x_platform_interface.dart';
-import 'package:file_x/file_x_method_channel.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
+import 'package:storax/storax_method_channel.dart';
+import 'package:storax/storax_platform_interface.dart';
+import 'package:storax/storax.dart';
 
 /// A mock platform implementation used to verify that
-/// [FileX] delegates calls to [FileXPlatform.instance].
-class MockFileXPlatform
+/// [Storax] delegates calls to [StoraxPlatform.instance].
+class MockStoraxPlatform
     with MockPlatformInterfaceMixin
-    implements FileXPlatform {
+    implements StoraxPlatform {
   @override
   Future<List<Map<String, dynamic>>> getNativeRoots() async {
     return [
@@ -82,7 +82,7 @@ class MockFileXPlatform
   Future<Map<String, dynamic>> permissionHealthCheck() async {
     return {'allFilesAccess': true, 'sdk': 34, 'oem': 'Mock'};
   }
-  
+
   @override
   Future<void> openFile({String? path, String? mime, String? uri}) {
     return Future.value();
@@ -90,23 +90,23 @@ class MockFileXPlatform
 }
 
 void main() {
-  final FileXPlatform initialPlatform = FileXPlatform.instance;
+  final StoraxPlatform initialPlatform = StoraxPlatform.instance;
 
-  test('$MethodChannelFileX is the default platform implementation', () {
-    expect(initialPlatform, isInstanceOf<MethodChannelFileX>());
+  test('$MethodChannelStorax is the default platform implementation', () {
+    expect(initialPlatform, isInstanceOf<MethodChannelStorax>());
   });
 
-  test('FileX delegates calls to the platform interface', () async {
-    final fileX = FileX();
-    final fakePlatform = MockFileXPlatform();
+  test('Storax delegates calls to the platform interface', () async {
+    final storax = Storax();
+    final fakePlatform = MockStoraxPlatform();
 
     // Inject mock platform
-    FileXPlatform.instance = fakePlatform;
+    StoraxPlatform.instance = fakePlatform;
 
-    final roots = await fileX.getNativeRoots();
-    final files = await fileX.listDirectory(target: '/mock/path', isSaf: false);
-    final hasAccess = await fileX.hasAllFilesAccess();
-    final oem = await fileX.detectOEM();
+    final roots = await storax.getNativeRoots();
+    final files = await storax.listDirectory(target: '/mock/path', isSaf: false);
+    final hasAccess = await storax.hasAllFilesAccess();
+    final oem = await storax.detectOEM();
 
     expect(roots.first['name'], 'Mock storage');
     expect(files.first['name'], 'mock.txt');
@@ -114,6 +114,6 @@ void main() {
     expect(oem['manufacturer'], 'Mock');
 
     // Restore original platform
-    FileXPlatform.instance = initialPlatform;
+    StoraxPlatform.instance = initialPlatform;
   });
 }

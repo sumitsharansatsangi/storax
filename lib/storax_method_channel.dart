@@ -1,44 +1,44 @@
 import 'dart:async';
 import 'package:flutter/services.dart';
-import 'file_x_platform_interface.dart';
+import 'storax_platform_interface.dart';
 
-/// MethodChannel-based implementation of [FileXPlatform].
+/// MethodChannel-based implementation of [StoraxPlatform].
 ///
 /// This class is the Flutter-side client for the native Android
-/// FilexPlugin. It exposes strongly-typed methods that internally
+/// StoraxPlugin. It exposes strongly-typed methods that internally
 /// communicate with Android via a MethodChannel.
 ///
 /// All heavy work (filesystem, SAF, traversal) happens on the
 /// native side. This layer is intentionally thin.
-class MethodChannelFileX extends FileXPlatform {
+class MethodChannelStorax extends StoraxPlatform {
   /// Channel name **must exactly match** the one used in Android:
   ///
-  /// MethodChannel(binding.binaryMessenger, "file_x")
-  static const MethodChannel _channel = MethodChannel('file_x');
-  
+  /// MethodChannel(binding.binaryMessenger, "storax")
+  static const MethodChannel _channel = MethodChannel('storax');
+
   /// Event stream
-  static final StreamController<FileXEvent> _events =
-      StreamController<FileXEvent>.broadcast();
-  MethodChannelFileX() {
+  static final StreamController<StoraxEvent> _events =
+      StreamController<StoraxEvent>.broadcast();
+  MethodChannelStorax() {
     _channel.setMethodCallHandler(_handleNativeCallbacks);
   }
 
-  static Stream<FileXEvent> get events => _events.stream;
+  static Stream<StoraxEvent> get events => _events.stream;
 
   static Future<void> _handleNativeCallbacks(MethodCall call) async {
     switch (call.method) {
       case 'onUsbAttached':
-        _events.add(const FileXEvent(FileXEventType.usbAttached));
+        _events.add(const StoraxEvent(StoraxEventType.usbAttached));
         break;
 
       case 'onUsbDetached':
-        _events.add(const FileXEvent(FileXEventType.usbDetached));
+        _events.add(const StoraxEvent(StoraxEventType.usbDetached));
         break;
 
       case 'onSafPicked':
         _events.add(
-          FileXEvent(
-            FileXEventType.safPicked,
+          StoraxEvent(
+            StoraxEventType.safPicked,
             payload: call.arguments as String?,
           ),
         );
@@ -126,13 +126,15 @@ class MethodChannelFileX extends FileXPlatform {
     int maxDepth = 10,
     Map<String, dynamic>? filters,
   }) async {
-    final result = await _channel
-        .invokeMethod<List<dynamic>>('traverseDirectory', {
-          'target': target,
-          'isSaf': isSaf,
-          'maxDepth': maxDepth,
-          'filters': ?filters,
-        });
+    final result = await _channel.invokeMethod<List<dynamic>>(
+      'traverseDirectory',
+      {
+        'target': target,
+        'isSaf': isSaf,
+        'maxDepth': maxDepth,
+        'filters': ?filters,
+      },
+    );
     return _castList(result);
   }
 
@@ -224,11 +226,7 @@ class MethodChannelFileX extends FileXPlatform {
   ///
   /// [mime] is optional and may be used to override the detected MIME type.
   @override
-  Future<void> openFile({
-    String? path,
-    String? mime,
-    String? uri,
-  }) async {
+  Future<void> openFile({String? path, String? mime, String? uri}) async {
     assert(
       (path != null) ^ (uri != null),
       'Exactly one of "path" or "uri" must be provided',
@@ -241,12 +239,11 @@ class MethodChannelFileX extends FileXPlatform {
   }
 }
 
+enum StoraxEventType { usbAttached, usbDetached, safPicked }
 
-enum FileXEventType { usbAttached, usbDetached, safPicked }
-
-class FileXEvent {
-  final FileXEventType type;
+class StoraxEvent {
+  final StoraxEventType type;
   final String? payload;
 
-  const FileXEvent(this.type, {this.payload});
+  const StoraxEvent(this.type, {this.payload});
 }

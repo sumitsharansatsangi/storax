@@ -1,6 +1,6 @@
 # file_x_example
 
-Demonstrates how to use the file_x plugin.
+Demonstrates how to use the storax plugin.
 
 ## Getting Started
 

@@ -1,12 +1,12 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:file_x/file_x_method_channel.dart';
+import 'package:storax/storax_method_channel.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  const MethodChannel channel = MethodChannel('file_x');
-  final MethodChannelFileX platform = MethodChannelFileX();
+  const MethodChannel channel = MethodChannel('storax');
+  final MethodChannelStorax platform = MethodChannelStorax();
 
   setUp(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -56,7 +56,7 @@ void main() {
         .setMockMethodCallHandler(channel, null);
   });
 
-  group('MethodChannelFileX', () {
+  group('MethodChannelStorax', () {
     test('getNativeRoots returns parsed roots', () async {
       final roots = await platform.getNativeRoots();
 

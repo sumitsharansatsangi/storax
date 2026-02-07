@@ -1,15 +1,15 @@
 import 'dart:async';
 
-import 'package:file_x/file_x.dart';
-import 'package:file_x/file_x_method_channel.dart';
+import 'package:storax/storax.dart';
+import 'package:storax/storax_method_channel.dart';
 import 'package:flutter/material.dart';
 
 void main() {
-  runApp(const FileXExampleApp());
+  runApp(const StoraxExampleApp());
 }
 
-class FileXExampleApp extends StatelessWidget {
-  const FileXExampleApp({super.key});
+class StoraxExampleApp extends StatelessWidget {
+  const StoraxExampleApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -33,22 +33,21 @@ class RootsPage extends StatefulWidget {
 }
 
 class _RootsPageState extends State<RootsPage> with WidgetsBindingObserver {
-  final fileX = FileX();
+  final storax = Storax();
   List<Map<String, dynamic>> roots = [];
   bool loading = true;
-  late final StreamSubscription<FileXEvent> _sub;
-
+  late final StreamSubscription<StoraxEvent> _sub;
 
   Future<void> ensureStoragePermission(
-    FileX fileX,
+    Storax storax,
     BuildContext context,
   ) async {
-    final hasAccess = await fileX.hasAllFilesAccess();
+    final hasAccess = await storax.hasAllFilesAccess();
 
     if (hasAccess == true) return;
 
     // Android 11+ All Files Access dialog
-    await fileX.requestAllFilesAccess();
+    await storax.requestAllFilesAccess();
     if (context.mounted) {
       // Tell user what to do
       await showDialog(
@@ -74,14 +73,14 @@ class _RootsPageState extends State<RootsPage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _sub = fileX.events.listen((event) async {
+    _sub = storax.events.listen((event) async {
       switch (event.type) {
-        case FileXEventType.usbAttached:
+        case StoraxEventType.usbAttached:
           await _handleUsbAttached();
           break;
 
-        case FileXEventType.usbDetached:
-        case FileXEventType.safPicked:
+        case StoraxEventType.usbDetached:
+        case StoraxEventType.safPicked:
           await _refreshRoots();
           break;
       }
@@ -99,7 +98,7 @@ class _RootsPageState extends State<RootsPage> with WidgetsBindingObserver {
     // Give Android a moment to finish mounting
     await Future.delayed(const Duration(milliseconds: 600));
 
-    final updatedRoots = await fileX.getAllRoots();
+    final updatedRoots = await storax.getAllRoots();
 
     final nativeUsbAppeared = updatedRoots.any((r) {
       return r['type'] == 'native' &&
@@ -129,7 +128,7 @@ class _RootsPageState extends State<RootsPage> with WidgetsBindingObserver {
       );
 
       if (shouldAsk == true) {
-        await fileX.openSafFolderPicker();
+        await storax.openSafFolderPicker();
       }
     }
 
@@ -140,9 +139,8 @@ class _RootsPageState extends State<RootsPage> with WidgetsBindingObserver {
     });
   }
 
-
   Future<void> _refreshRoots() async {
-    final data = await fileX.getAllRoots();
+    final data = await storax.getAllRoots();
     if (!mounted) return;
     setState(() {
       roots = data;
@@ -150,12 +148,10 @@ class _RootsPageState extends State<RootsPage> with WidgetsBindingObserver {
     });
   }
 
-
   Future<void> _init() async {
-    await ensureStoragePermission(fileX, context);
+    await ensureStoragePermission(storax, context);
     await _refreshRoots();
   }
-
 
   @override
   void dispose() {
@@ -181,8 +177,8 @@ class _RootsPageState extends State<RootsPage> with WidgetsBindingObserver {
             icon: const Icon(Icons.add),
             tooltip: 'Pick SAF folder',
             onPressed: () async {
-              await fileX.openSafFolderPicker();
-              final allRoots = await fileX.getAllRoots();
+              await storax.openSafFolderPicker();
+              final allRoots = await storax.getAllRoots();
               setState(() {
                 roots = allRoots;
               });
@@ -208,7 +204,7 @@ class _RootsPageState extends State<RootsPage> with WidgetsBindingObserver {
                       isSaf
                           ? const Text('SAF folder')
                           : Text(
-                              '${fileX.formatBytes(r['free'] ?? 0)} free of ${fileX.formatBytes(r['total'] ?? 0)}',
+                              '${storax.formatBytes(r['free'] ?? 0)} free of ${storax.formatBytes(r['total'] ?? 0)}',
                             ),
                     ],
                   ),
@@ -251,7 +247,7 @@ class FileBrowserPage extends StatefulWidget {
 }
 
 class _FileBrowserPageState extends State<FileBrowserPage> {
-  final fileX = FileX();
+  final storax = Storax();
 
   final List<String> pathStack = [];
   List<Map<String, dynamic>> entries = [];
@@ -268,7 +264,7 @@ class _FileBrowserPageState extends State<FileBrowserPage> {
   }
 
   Future<void> _load() async {
-    final data = await fileX.listDirectory(
+    final data = await storax.listDirectory(
       target: pathStack.last,
       isSaf: widget.isSaf,
     );
@@ -303,7 +299,7 @@ class _FileBrowserPageState extends State<FileBrowserPage> {
       _load();
     } else {
       debugPrint("Opening ${e['path']} with ${e['mime']}");
-      fileX.openFile(path: e['path'], mime: e['mime']);
+      storax.openFile(path: e['path'], mime: e['mime']);
     }
   }
 

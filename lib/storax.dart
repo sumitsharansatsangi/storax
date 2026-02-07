@@ -1,21 +1,21 @@
-import 'package:file_x/file_x_method_channel.dart';
+import 'package:storax/storax_method_channel.dart';
 
-import 'file_x_platform_interface.dart';
+import 'storax_platform_interface.dart';
 
-/// FileX
+/// Storax
 ///
-/// Public Flutter-facing API for the FileX plugin.
+/// Public Flutter-facing API for the Storax plugin.
 ///
-/// This class is a thin façade over [FileXPlatform] that provides
+/// This class is a thin façade over [StoraxPlatform] that provides
 /// a clean, discoverable interface for application code.
 ///
 /// App code should ONLY interact with this class.
 /// Platform-specific details (MethodChannel, Android SAF, etc.)
 /// are intentionally hidden.
-class FileX {
-
+class Storax {
   /// Event stream
-  Stream<FileXEvent> get events =>  MethodChannelFileX.events;
+  Stream<StoraxEvent> get events => MethodChannelStorax.events;
+
   /// Returns native filesystem roots such as:
   /// - Internal storage
   /// - External SD card
@@ -24,7 +24,7 @@ class FileX {
   ///
   /// Each root includes storage statistics like total/free space.
   Future<List<Map<String, dynamic>>> getNativeRoots() {
-    return FileXPlatform.instance.getNativeRoots();
+    return StoraxPlatform.instance.getNativeRoots();
   }
 
   /// Returns all available roots:
@@ -33,7 +33,7 @@ class FileX {
   ///
   /// Useful for building a unified "Select storage location" UI.
   Future<List<Map<String, dynamic>>> getAllRoots() {
-    return FileXPlatform.instance.getAllRoots();
+    return StoraxPlatform.instance.getAllRoots();
   }
 
   /// Lists immediate children of a directory.
@@ -57,7 +57,7 @@ class FileX {
     required bool isSaf,
     Map<String, dynamic>? filters,
   }) {
-    return FileXPlatform.instance.listDirectory(
+    return StoraxPlatform.instance.listDirectory(
       target: target,
       isSaf: isSaf,
       filters: filters,
@@ -82,7 +82,7 @@ class FileX {
     int maxDepth = 10,
     Map<String, dynamic>? filters,
   }) {
-    return FileXPlatform.instance.traverseDirectory(
+    return StoraxPlatform.instance.traverseDirectory(
       target: target,
       isSaf: isSaf,
       maxDepth: maxDepth,
@@ -101,7 +101,7 @@ class FileX {
   ///
   /// Your app should listen for that event if it needs the URI.
   Future<void> openSafFolderPicker() {
-    return FileXPlatform.instance.openSafFolderPicker();
+    return StoraxPlatform.instance.openSafFolderPicker();
   }
 
   // ─────────────────────────────────────────────
@@ -112,13 +112,13 @@ class FileX {
   /// - MANAGE_EXTERNAL_STORAGE on Android 11+
   /// - Always `true` on older Android versions
   Future<bool> hasAllFilesAccess() {
-    return FileXPlatform.instance.hasAllFilesAccess();
+    return StoraxPlatform.instance.hasAllFilesAccess();
   }
 
   /// Opens the system settings screen where the user
   /// can grant full filesystem (file manager) access.
   Future<void> requestAllFilesAccess() {
-    return FileXPlatform.instance.requestAllFilesAccess();
+    return StoraxPlatform.instance.requestAllFilesAccess();
   }
 
   // ─────────────────────────────────────────────
@@ -133,7 +133,7 @@ class FileX {
   ///
   /// Useful for debugging OEM-specific storage behavior.
   Future<Map<String, dynamic>> detectOEM() {
-    return FileXPlatform.instance.detectOEM();
+    return StoraxPlatform.instance.detectOEM();
   }
 
   /// Performs a high-level permission and environment health check.
@@ -143,7 +143,7 @@ class FileX {
   /// - Support logs
   /// - Play Store reviewer diagnostics
   Future<Map<String, dynamic>> permissionHealthCheck() {
-    return FileXPlatform.instance.permissionHealthCheck();
+    return StoraxPlatform.instance.permissionHealthCheck();
   }
 
   /// Opens a file for reading.
@@ -154,19 +154,11 @@ class FileX {
   /// - A file:// URI
   ///
   /// [mime] is optional and may be used to override the detected MIME type.
-  Future<void> openFile({
-    String? path,
-    String? mime,
-    String? uri,
-  }) {
-    return FileXPlatform.instance.openFile(
-      path: path,
-      mime: mime,
-      uri: uri,
-    );
+  Future<void> openFile({String? path, String? mime, String? uri}) {
+    return StoraxPlatform.instance.openFile(path: path, mime: mime, uri: uri);
   }
 
-   String formatBytes(int bytes) {
+  String formatBytes(int bytes) {
     const units = ['B', 'KB', 'MB', 'GB', 'TB'];
     double size = bytes.toDouble();
     int unit = 0;
@@ -178,6 +170,4 @@ class FileX {
 
     return '${size.toStringAsFixed(2)} ${units[unit]}';
   }
-
-
 }

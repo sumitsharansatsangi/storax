@@ -1,35 +1,35 @@
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
-import 'file_x_method_channel.dart';
+import 'storax_method_channel.dart';
 
-/// Platform interface for the FileX plugin.
+/// Platform interface for the Storax plugin.
 ///
 /// This class defines the **contract** that all platform-specific
 /// implementations (Android, iOS, desktop, web) must follow.
 ///
-/// The default implementation is [MethodChannelFileX], which talks
+/// The default implementation is [MethodChannelStorax], which talks
 /// to the native Android plugin via a MethodChannel.
 ///
 /// ⚠️ Do NOT add implementation logic here.
 /// This class must remain abstract.
-abstract class FileXPlatform extends PlatformInterface {
-  FileXPlatform() : super(token: _token);
+abstract class StoraxPlatform extends PlatformInterface {
+  StoraxPlatform() : super(token: _token);
 
   static final Object _token = Object();
 
-  static FileXPlatform _instance = MethodChannelFileX();
+  static StoraxPlatform _instance = MethodChannelStorax();
 
   /// The active platform implementation.
   ///
-  /// By default this is [MethodChannelFileX].
+  /// By default this is [MethodChannelStorax].
   /// Platform-specific implementations (e.g. desktop, web)
   /// may override this during registration.
-  static FileXPlatform get instance => _instance;
+  static StoraxPlatform get instance => _instance;
 
   /// Sets a new platform implementation.
   ///
   /// This is typically called by platform-specific registration code.
-  static set instance(FileXPlatform instance) {
+  static set instance(StoraxPlatform instance) {
     PlatformInterface.verifyToken(instance, _token);
     _instance = instance;
   }
@@ -154,9 +154,5 @@ abstract class FileXPlatform extends PlatformInterface {
   /// - A file:// URI
   ///
   /// [mime] is optional and may be used to override the detected MIME type.
-  Future<void> openFile({
-    String? path,
-    String? mime,
-    String? uri,
-  });
+  Future<void> openFile({String? path, String? mime, String? uri});
 }

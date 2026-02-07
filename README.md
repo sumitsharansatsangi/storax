@@ -1,10 +1,11 @@
-# file_x
+# storax
+Android storage access for Flutter — SAF-aware, OEM-safe, and honest.
 
-[![Pub Version](https://img.shields.io/pub/v/file_x.svg)](https://pub.dev/packages/file_x)
-[![License](https://img.shields.io/github/license/sumitsharansatsangi/file_x.svg)](LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/sumitsharansatsangi/phone_parser.svg?style=social)](https://github.com/sumitsharansatsangi/file_x)
+[![Pub Version](https://img.shields.io/pub/v/storax.svg)](https://pub.dev/packages/storax)
+[![License](https://img.shields.io/github/license/sumitsharansatsangi/storax.svg)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/sumitsharansatsangi/phone_parser.svg?style=social)](https://github.com/sumitsharansatsangi/storax)
 
-`file_x` is an **Android-focused Flutter plugin** that provides a **correct, OEM-aware, SAF-compliant file access layer** for real-world apps.
+`storax` is an **Android-focused Flutter plugin** that provides a **correct, OEM-aware, SAF-compliant file access layer** for real-world apps.
 
 It is designed for developers who need **truthful filesystem access** instead of fragile shortcuts that break across devices.
 
@@ -13,7 +14,7 @@ It is designed for developers who need **truthful filesystem access** instead of
 
 ---
 
-## Why file_x exists
+## Why storax exists
 
 On modern Android:
 
@@ -24,7 +25,7 @@ On modern Android:
 - SAF and native paths must coexist
 
 Most plugins **hide these realities**.  
-`file_x` embraces them and exposes a clean, predictable API.
+`storax` embraces them and exposes a clean, predictable API.
 
 ---
 
@@ -41,7 +42,7 @@ Retrieve a merged view of:
 - User-selected SAF folders
 
 ```dart
-final roots = await fileX.getAllRoots();
+final roots = await storax.getAllRoots();
 ````
 
 Each root includes:
@@ -61,7 +62,7 @@ List directories using either:
 * SAF tree URIs
 
 ```dart
-await fileX.listDirectory(
+await storax.listDirectory(
   target: pathOrUri,
   isSaf: trueOrFalse,
 );
@@ -78,7 +79,7 @@ await fileX.listDirectory(
 For search, indexing, analytics:
 
 ```dart
-await fileX.traverseDirectory(
+await storax.traverseDirectory(
   target: pathOrUri,
   isSaf: true,
   maxDepth: 5,
@@ -97,7 +98,7 @@ await fileX.traverseDirectory(
 
 ### 🔹 Path → SAF Resolution (Important)
 
-When opening a file by **path**, `file_x`:
+When opening a file by **path**, `storax`:
 
 1. Checks whether the path belongs to a persisted SAF tree
 2. Transparently resolves it to a SAF document URI
@@ -106,7 +107,7 @@ When opening a file by **path**, `file_x`:
 This avoids common crashes on Android 11+.
 
 ```dart
-await fileX.openFile(path: "/storage/...");
+await storax.openFile(path: "/storage/...");
 ```
 
 ---
@@ -126,7 +127,7 @@ With:
 * Chooser-based opening
 
 ```dart
-await fileX.openFile(
+await storax.openFile(
   path: filePath,
   mime: "application/pdf",
 );
@@ -139,7 +140,7 @@ await fileX.openFile(
 Used when native access is restricted:
 
 ```dart
-await fileX.openSafFolderPicker();
+await storax.openSafFolderPicker();
 ```
 
 * Persisted permissions
@@ -156,8 +157,8 @@ Detects:
 * Filesystem mount/unmount
 
 ```dart
-fileX.events.listen((event) {
-  if (event.type == FileXEventType.usbAttached) {
+storax.events.listen((event) {
+  if (event.type == StoraxEventType.usbAttached) {
     // Refresh roots or ask for SAF access
   }
 });
@@ -170,8 +171,8 @@ fileX.events.listen((event) {
 ### 🔹 Permission Handling (Honest)
 
 ```dart
-final hasAccess = await fileX.hasAllFilesAccess();
-await fileX.requestAllFilesAccess();
+final hasAccess = await storax.hasAllFilesAccess();
+await storax.requestAllFilesAccess();
 ```
 
 * Correct for Android 11+
@@ -183,8 +184,8 @@ await fileX.requestAllFilesAccess();
 ### 🔹 OEM Diagnostics
 
 ```dart
-final oem = await fileX.detectOEM();
-final health = await fileX.permissionHealthCheck();
+final oem = await storax.detectOEM();
+final health = await storax.permissionHealthCheck();
 ```
 
 Useful for:
@@ -206,7 +207,7 @@ Useful for:
 
 ---
 
-## What file_x does NOT do
+## What storax does NOT do
 
 * ❌ No background filesystem scanning
 * ❌ No silent access to USB storage
@@ -233,7 +234,7 @@ Including:
 * Background directory traversal
 * Consistency with OEM file explorers
 
-`file_x` intentionally avoids unsafe workarounds.
+`storax` intentionally avoids unsafe workarounds.
 
 ---
 
