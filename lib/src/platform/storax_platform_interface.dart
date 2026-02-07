@@ -1,7 +1,7 @@
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
-import 'package:storax/models/storax_oem.dart';
-import 'package:storax/models/storax_volume.dart';
-import 'package:storax/models/storax_entry.dart';
+import 'package:storax/src/models/storax_oem.dart';
+import 'package:storax/src/models/storax_volume.dart';
+import 'package:storax/src/models/storax_entry.dart';
 
 import 'storax_method_channel.dart';
 

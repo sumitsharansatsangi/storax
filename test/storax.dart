@@ -1,12 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
-import 'package:storax/models/storax_mode.dart';
-import 'package:storax/models/storax_oem.dart';
-import 'package:storax/models/storax_volume.dart';
-import 'package:storax/models/storax_entry.dart';
-import 'package:storax/storax_method_channel.dart';
-import 'package:storax/storax_platform_interface.dart';
-import 'package:storax/storax.dart';
+import 'package:storax/src/models/storax_mode.dart';
+import 'package:storax/src/models/storax_oem.dart';
+import 'package:storax/src/models/storax_volume.dart';
+import 'package:storax/src/models/storax_entry.dart';
+import 'package:storax/src/platform/storax_method_channel.dart';
+import 'package:storax/src/platform/storax_platform_interface.dart';
+import 'package:storax/src/storax.dart';
 
 /// A mock platform implementation used to verify that
 /// [Storax] delegates calls to [StoraxPlatform.instance].
@@ -73,7 +73,7 @@ class MockStoraxPlatform
 
   @override
   Future<StoraxOem?> detectOEM() async {
-    return  StoraxOem(
+    return StoraxOem(
       manufacturer: 'Mock',
       brand: 'MockBrand',
       model: 'MockModel',

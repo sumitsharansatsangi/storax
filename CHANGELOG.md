@@ -1,3 +1,7 @@
+## 0.0.4
+
+* Fix: Limit public API visibility to prevent unintended usage
+
 ## 0.0.3
 
 * Breaking change:

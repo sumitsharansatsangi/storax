@@ -1,10 +1,5 @@
 import 'dart:async';
-
-import 'package:storax/models/storax_entry.dart';
-import 'package:storax/models/storax_mode.dart';
-import 'package:storax/models/storax_volume.dart';
 import 'package:storax/storax.dart';
-import 'package:storax/storax_method_channel.dart';
 import 'package:flutter/material.dart';
 
 void main() {

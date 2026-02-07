@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:storax/models/storax_mode.dart';
+import 'package:storax/src/models/storax_mode.dart';
 
 /// Represents a file or directory returned by listDirectory / traverseDirectory
 @immutable
@@ -82,7 +82,7 @@ class StoraxEntry {
       size: size ?? this.size,
       lastModified: lastModified ?? this.lastModified,
       mime: mime ?? this.mime,
-      mode: accessType ?? this.mode,
+      mode: accessType ?? mode,
     );
   }
 

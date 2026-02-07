@@ -1,8 +1,9 @@
 import 'dart:async';
 import 'package:flutter/services.dart';
-import 'package:storax/models/storax_oem.dart';
-import 'package:storax/models/storax_volume.dart';
-import 'package:storax/models/storax_entry.dart';
+import 'package:storax/src/models/storax_oem.dart';
+import 'package:storax/src/models/storax_volume.dart';
+import 'package:storax/src/models/storax_entry.dart';
+import 'package:storax/src/models/storax_event.dart';
 import 'storax_platform_interface.dart';
 
 /// MethodChannel-based implementation of [StoraxPlatform].
@@ -231,8 +232,8 @@ class MethodChannelStorax extends StoraxPlatform {
       data.map((e) => StoraxEntry.fromMap(Map<String, dynamic>.from(e))),
     );
   }
- 
- StoraxOem? _parseOem(Map<dynamic, dynamic>? data) {
+
+  StoraxOem? _parseOem(Map<dynamic, dynamic>? data) {
     if (data == null) return null;
 
     return StoraxOem.fromMap(Map<String, dynamic>.from(data));
@@ -258,13 +259,4 @@ class MethodChannelStorax extends StoraxPlatform {
       'uri': uri,
     });
   }
-}
-
-enum StoraxEventType { usbAttached, usbDetached, safPicked }
-
-class StoraxEvent {
-  final StoraxEventType type;
-  final String? payload;
-
-  const StoraxEvent(this.type, {this.payload});
 }

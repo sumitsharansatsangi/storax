@@ -1,7 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:storax/models/storax_volume.dart';
-import 'package:storax/storax_method_channel.dart';
+import 'package:storax/src/models/storax_volume.dart';
+import 'package:storax/src/platform/storax_method_channel.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

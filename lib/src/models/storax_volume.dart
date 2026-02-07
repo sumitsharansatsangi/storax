@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:storax/models/storax_mode.dart';
+import 'package:storax/src/models/storax_mode.dart';
 
 /// Represents a storage root (internal / SD / USB / SAF-picked folder)
 @immutable
@@ -71,7 +71,7 @@ class StoraxVolume {
     bool? writable,
   }) {
     return StoraxVolume(
-      mode: accessType ?? this.mode,
+      mode: accessType ?? mode,
       name: name ?? this.name,
       path: path ?? this.path,
       uri: uri ?? this.uri,
