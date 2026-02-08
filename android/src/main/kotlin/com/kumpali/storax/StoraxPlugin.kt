@@ -24,6 +24,7 @@ import java.util.Locale
 import java.util.concurrent.Executors
 import androidx.core.net.toUri
 import android.hardware.usb.UsbManager
+import java.util.concurrent.ConcurrentHashMap
 
 
 /**
@@ -97,10 +98,9 @@ class StoraxPlugin :
     private var pendingMime: String? = null
 
     // SAF tree → resolved filesystem prefix
-    private val safRootPathCache = mutableMapOf<Uri, String>()
-
+    private val safRootPathCache = ConcurrentHashMap<Uri, String>()
     // File path → resolved document URI
-    private val safFileCache = mutableMapOf<String, Uri>()
+    private val safFileCache = ConcurrentHashMap<String, Uri>()
 
     // ─────────────────────────────────────────────
     // Flutter engine lifecycle
@@ -362,6 +362,283 @@ class StoraxPlugin :
                 launchSaf(mime, result)
 
             }
+            "createFolder" -> {
+                val parent = call.argument<String>("parent") ?: run {
+                    result.error("INVALID", "Missing parent", null)
+                    return
+                }
+                val name = call.argument<String>("name") ?: run {
+                    result.error("INVALID", "Missing name", null)
+                    return
+                }
+                val isSaf = call.argument<Boolean>("isSaf") ?: false
+
+                executor.execute {
+                    try {
+                        if (isSaf) {
+                            createSafFolder(parent.toUri(), name)
+                        } else {
+                            createNativeFolder(parent, name)
+                        }
+                        mainHandler.post { result.success(true) }
+                    } catch (e: Exception) {
+                        mainHandler.post {
+                            result.error("CREATE_FOLDER_FAILED", e.message, null)
+                        }
+                    }
+                }
+            }
+
+            "createFile" -> {
+                val parent = call.argument<String>("parent") ?: run {
+                    result.error("INVALID", "Missing parent", null)
+                    return
+                }
+                val name = call.argument<String>("name") ?: run {
+                    result.error("INVALID", "Missing name", null)
+                    return
+                }
+                val mime = call.argument<String>("mime") // optional
+                val isSaf = call.argument<Boolean>("isSaf") ?: false
+
+                executor.execute {
+                    try {
+                        if (isSaf) {
+                            createSafFile(parent.toUri(), name, mime)
+                        } else {
+                            createNativeFile(parent, name)
+                        }
+                        mainHandler.post { result.success(true) }
+                    } catch (e: Exception) {
+                        mainHandler.post {
+                            result.error("CREATE_FILE_FAILED", e.message, null)
+                        }
+                    }
+                }
+            }
+
+            "copy" -> {
+                val source = call.argument<String>("source") ?: run {
+                    result.error("INVALID", "Missing source", null)
+                    return
+                }
+                val destination = call.argument<String>("destination") ?: run {
+                    result.error("INVALID", "Missing destination", null)
+                    return
+                }
+                val isSaf = call.argument<Boolean>("isSaf") ?: false
+
+                val jobId = newJobId()
+                result.success(jobId) // 🔥 return immediately
+
+                executor.execute {
+                    try {
+                        if (isSaf) {
+                            val srcUri = source.toUri()
+                            val dstDir = DocumentFile.fromTreeUri(context, destination.toUri())
+                                ?: throw IllegalStateException("Invalid SAF destination")
+                            val srcDoc = DocumentFile.fromSingleUri(context, srcUri)
+                            val name = srcDoc?.name ?: "file_${System.currentTimeMillis()}"
+                            copySafFile(srcUri, dstDir, name, jobId)
+                        } else {
+                            copyNativeFile(
+                                File(source),
+                                File(destination),
+                                jobId
+                            )
+                        }
+
+                    } catch (e: Exception) {
+                        emitProgress(
+                            mapOf("jobId" to jobId, "error" to e.message)
+                        )
+                    }
+                }
+            }
+            "rename" -> {
+                val target = call.argument<String>("target") ?: run {
+                    result.error("INVALID", "Missing target", null)
+                    return
+                }
+                val newName = call.argument<String>("newName") ?: run {
+                    result.error("INVALID", "Missing newName", null)
+                    return
+                }
+                val isSaf = call.argument<Boolean>("isSaf") ?: false
+
+                executor.execute {
+                    try {
+                        if (isSaf) {
+                            renameSafWithFallback(
+                                target.toUri(),
+                                newName
+                            )
+                        } else {
+                            renameNative(target, newName)
+                        }
+
+                        mainHandler.post { result.success(true) }
+                    } catch (e: Exception) {
+                        mainHandler.post {
+                            result.error("RENAME_FAILED", e.message, null)
+                        }
+                    }
+                }
+
+            }
+
+            "delete" -> {
+                val target = call.argument<String>("target") ?: return
+                val isSaf = call.argument<Boolean>("isSaf") ?: false
+
+                executor.execute {
+                    try {
+                        if (isSaf) {
+                            deleteSaf(target.toUri())
+                        } else {
+                            deleteNative(target)
+                        }
+                        mainHandler.post { result.success(true) }
+                    } catch (e: Exception) {
+                        mainHandler.post {
+                            result.error("DELETE_FAILED", e.message, null)
+                        }
+                    }
+                }
+            }
+            "move" -> {
+                val source = call.argument<String>("source") ?: return
+                val destination = call.argument<String>("destination") ?: return
+                val isSaf = call.argument<Boolean>("isSaf") ?: false
+
+                val jobId = newJobId()
+                result.success(jobId)
+
+                executor.execute {
+                    try {
+                        if (isSaf) {
+                            val srcUri = source.toUri()
+                            val dstDir = DocumentFile.fromTreeUri(context, destination.toUri())
+                                ?: throw IllegalStateException("Invalid SAF destination")
+
+                            copySafFile(srcUri, dstDir, "moved_${System.currentTimeMillis()}", jobId)
+                            deleteSaf(srcUri)
+                        } else {
+                            copyNativeFile(File(source), File(destination), jobId)
+                            File(source).delete()
+                        }
+                    } catch (e: Exception) {
+                        emitProgress(
+                            mapOf("jobId" to jobId, "error" to e.message)
+                        )
+                    }
+                }
+            }
+            "moveToTrash" -> {
+                val target = call.argument<String>("target") ?: run {
+                    result.error("INVALID", "Missing target", null)
+                    return
+                }
+                val isSaf = call.argument<Boolean>("isSaf") ?: false
+                val safRootUri = call.argument<String>("safRootUri")
+
+                executor.execute {
+                    try {
+                        if (isSaf) {
+                            if (safRootUri == null) {
+                                throw IllegalArgumentException("Missing safRootUri")
+                            }
+                            moveSafToTrash(target.toUri(), safRootUri.toUri())
+                        } else {
+                            moveNativeToTrash(target)
+                        }
+
+                        mainHandler.post { result.success(true) }
+                    } catch (e: Exception) {
+                        mainHandler.post {
+                            result.error("TRASH_FAILED", e.message, null)
+                        }
+                    }
+                }
+            }
+            "listTrash" -> {
+                executor.execute {
+                    try {
+                        val list =(
+                            readNativeTrashEntries() +
+                                    readSafTrashEntries()
+                        )
+                                        .map { it.toMap() }
+
+                        mainHandler.post { result.success(list) }
+                    } catch (e: Exception) {
+                        mainHandler.post {
+                            result.error("LIST_TRASH_FAILED", e.message, null)
+                        }
+                    }
+                }
+            }
+            "restoreFromTrash" -> {
+                val entryMap = call.argument<Map<String, Any?>>("entry") ?: run {
+                    result.error("INVALID", "Missing entry", null)
+                    return
+                }
+
+                executor.execute {
+                    try {
+                        val entry = trashEntryFromMap(entryMap)
+
+                        if (entry.isSaf) {
+                            restoreSaf(entry)
+                        } else {
+                            restoreNative(entry)
+                        }
+
+                        mainHandler.post { result.success(true) }
+                    } catch (e: Exception) {
+                        mainHandler.post {
+                            result.error("RESTORE_FAILED", e.message, null)
+                        }
+                    }
+                }
+            }
+            "emptyTrash" -> {
+                val isSaf = call.argument<Boolean>("isSaf") ?: false
+                val safRootUri = call.argument<String>("safRootUri")
+
+                executor.execute {
+                    try {
+                        if (isSaf) {
+                            if (safRootUri == null) {
+                                throw IllegalArgumentException("Missing safRootUri")
+                            }
+                            emptySafTrash(safRootUri.toUri())
+                            emptySafTrashMetadata()
+                        } else {
+                            emptyNativeTrash()
+                        }
+
+                        mainHandler.post { result.success(true) }
+                    } catch (e: Exception) {
+                        mainHandler.post {
+                            result.error("EMPTY_TRASH_FAILED", e.message, null)
+                        }
+                    }
+                }
+            }
+            "emptySafTrashMetadata" -> {
+                executor.execute {
+                    try {
+                        emptySafTrashMetadata()
+                        mainHandler.post { result.success(true) }
+                    } catch (e: Exception) {
+                        mainHandler.post {
+                            result.error("EMPTY_SAF_METADATA_FAILED", e.message, null)
+                        }
+                    }
+                }
+            }
+
             else -> result.notImplemented()
         }
     }
@@ -1037,6 +1314,532 @@ class StoraxPlugin :
         }
 
         return false
+    }
+
+    private fun createNativeFolder(parentPath: String, name: String) {
+        val parent = File(parentPath)
+        if (!parent.exists() || !parent.isDirectory) {
+            throw IllegalStateException("Invalid parent directory")
+        }
+
+        val folder = File(parent, name)
+        if (folder.exists()) {
+            throw IllegalStateException("Folder already exists")
+        }
+
+        if (!folder.mkdirs()) {
+            throw IllegalStateException("Failed to create folder")
+        }
+    }
+
+    private fun createNativeFile(parentPath: String, name: String) {
+        val parent = File(parentPath)
+        if (!parent.exists() || !parent.isDirectory) {
+            throw IllegalStateException("Invalid parent directory")
+        }
+
+        val file = File(parent, name)
+        if (file.exists()) {
+            throw IllegalStateException("File already exists")
+        }
+
+        file.parentFile?.mkdirs()
+        if (!file.createNewFile()) {
+            throw IllegalStateException("Failed to create file")
+        }
+    }
+
+    private fun createSafFolder(parentUri: Uri, name: String) {
+        val parent = DocumentFile.fromTreeUri(context, parentUri)
+            ?: throw IllegalStateException("Invalid SAF parent")
+
+        if (parent.findFile(name) != null) {
+            throw IllegalStateException("Folder already exists")
+        }
+
+        parent.createDirectory(name)
+            ?: throw IllegalStateException("Failed to create SAF folder")
+    }
+
+    private fun createSafFile(
+        parentUri: Uri,
+        name: String,
+        mime: String?
+    ) {
+        val parent = DocumentFile.fromTreeUri(context, parentUri)
+            ?: throw IllegalStateException("Invalid SAF parent")
+
+        if (parent.findFile(name) != null) {
+            throw IllegalStateException("File already exists")
+        }
+
+        // If MIME not provided, infer from extension
+        val finalMime = mime ?: run {
+            val ext = name.substringAfterLast('.', "")
+            android.webkit.MimeTypeMap.getSingleton()
+                .getMimeTypeFromExtension(ext.lowercase())
+                ?: "application/octet-stream"
+        }
+
+        parent.createFile(finalMime, name)
+            ?: throw IllegalStateException("Failed to create SAF file")
+    }
+
+
+    private fun copyNativeFile(
+        src: File,
+        dst: File,
+        jobId: String
+    ) {
+        val total = src.length()
+        var copied = 0L
+        var lastEmitted = 0L
+        val buffer = ByteArray(64 * 1024)
+
+        src.inputStream().use { input ->
+            val finalDst =
+                if (dst.isDirectory)
+                    File(dst, src.name)
+                else
+                    dst
+
+            finalDst.parentFile?.mkdirs()
+            finalDst.outputStream().use { output ->
+                var read: Int
+                while (input.read(buffer).also { read = it } != -1) {
+                    output.write(buffer, 0, read)
+                    copied += read
+
+                    if (copied - lastEmitted >= 512 * 1024 || copied == total) {
+                        emitProgress(
+                            mapOf(
+                                "jobId" to jobId,
+                                "type" to 0, // copy
+                                "source" to src.absolutePath,
+                                "destination" to finalDst.absolutePath,
+                                "processed" to copied,
+                                "total" to total
+                            )
+                        )
+                        lastEmitted = copied
+                    }
+                }
+            }
+        }
+        emitProgress(mapOf(
+            "jobId" to jobId,
+            "processed" to total,
+            "total" to total,
+            "done" to true
+        ))
+    }
+
+
+    private fun newJobId(): String =
+        System.currentTimeMillis().toString() + "_" + (Math.random() * 100000).toInt()
+
+    private fun copySafFile(
+        srcUri: Uri,
+        dstDir: DocumentFile,
+        name: String,
+        jobId: String
+    ) {
+        val resolver = context.contentResolver
+
+        val srcDoc = DocumentFile.fromSingleUri(context, srcUri)
+            ?: throw IllegalStateException("Invalid source SAF file")
+
+        val fileName = srcDoc.name ?: name
+        val mimeType = srcDoc.type ?: "*/*"
+
+        val dstDoc = dstDir.createFile(mimeType, fileName)
+            ?: throw IllegalStateException("Failed to create destination SAF file")
+
+        val total = srcDoc.length()
+        var copied = 0L
+        var lastEmitted = 0L
+        val buffer = ByteArray(64 * 1024)
+
+        resolver.openInputStream(srcDoc.uri)?.use { input ->
+            resolver.openOutputStream(dstDoc.uri)?.use { output ->
+                var read: Int
+                while (input.read(buffer).also { read = it } != -1) {
+                    output.write(buffer, 0, read)
+                    copied += read
+
+                    // 🔁 Throttled progress update (every ~512 KB)
+                    if (copied - lastEmitted >= 512 * 1024 || copied == total) {
+                        emitProgress(mapOf(
+                            "jobId" to jobId,
+                            "type" to 0, // copy
+                            "source" to srcDoc.uri.toString(),
+                            "destination" to dstDoc.uri.toString(),
+                            "processed" to copied,
+                            "total" to total
+                        ))
+                        lastEmitted = copied
+                    }
+                }
+            }
+        } ?: throw IllegalStateException("Failed to open SAF input stream")
+        emitProgress(mapOf(
+            "jobId" to jobId,
+            "processed" to total,
+            "total" to total,
+            "done" to true
+        ))
+    }
+
+
+    private fun renameNative(path: String, newName: String) {
+        val src = File(path)
+        if (!src.exists()) {
+            throw IllegalStateException("Source does not exist")
+        }
+
+        val dst = File(src.parentFile, newName)
+
+        if (dst.exists()) {
+            throw IllegalStateException("Target name already exists")
+        }
+
+        val ok = src.renameTo(dst)
+        if (!ok) {
+            throw IllegalStateException("Native rename failed")
+        }
+    }
+
+    private fun renameSaf(uri: Uri, newName: String): Boolean {
+        val resolver = context.contentResolver
+
+        val doc = DocumentFile.fromSingleUri(context, uri)
+            ?: DocumentFile.fromTreeUri(context, uri)
+            ?: return false
+
+        return try {
+            DocumentsContract.renameDocument(
+                resolver,
+                doc.uri,
+                newName
+            ) != null
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun renameSafWithFallback(
+        uri: Uri,
+        newName: String
+    ) {
+        // 1️⃣ Try native SAF rename
+        if (renameSaf(uri, newName)) return
+
+        // 2️⃣ Fallback ONLY for files
+        val src = DocumentFile.fromSingleUri(context, uri)
+            ?: throw IllegalStateException("Invalid SAF source")
+
+        if (src.isDirectory) {
+            throw IllegalStateException("SAF directory rename fallback not supported")
+        }
+
+        // 3️⃣ Parent via SAF (NOT rootUri)
+        val parent = src.parentFile
+            ?: throw IllegalStateException("SAF parent not found")
+
+        // 4️⃣ Create sibling with new name
+        val dst = parent.createFile(
+            src.type ?: "*/*",
+            newName
+        ) ?: throw IllegalStateException("Fallback create failed")
+
+        // 5️⃣ Copy + delete
+        copySafStreams(src, dst)
+        deleteSafRecursive(src)
+    }
+
+
+    private fun deleteNative(path: String) {
+        val file = File(path)
+        if (!file.exists()) return
+
+        if (file.isDirectory) {
+            file.deleteRecursively()
+        } else {
+            file.delete()
+        }
+    }
+
+
+    private fun deleteSaf(uri: Uri) {
+        val doc = DocumentFile.fromSingleUri(context, uri)
+            ?: DocumentFile.fromTreeUri(context, uri)
+            ?: return
+
+        deleteSafRecursive(doc)
+    }
+
+    private fun deleteSafRecursive(doc: DocumentFile) {
+        if (doc.isDirectory) {
+            doc.listFiles().forEach { child ->
+                deleteSafRecursive(child)
+            }
+        }
+        try {
+            doc.delete()
+        } catch (e: Exception) {
+            Log.e("Storax", "Failed to delete SAF document: ${doc.uri}", e)
+        }
+    }
+
+    private fun nativeTrashDir(): File {
+        val dir = File(Environment.getExternalStorageDirectory(), ".storax_trash")
+        if (!dir.exists()) dir.mkdirs()
+        return dir
+    }
+
+    private fun safTrashDir(root: DocumentFile): DocumentFile {
+        root.findFile(".storax_trash")?.let { return it }
+
+        return root.createDirectory(".storax_trash")
+            ?: throw IllegalStateException("Failed to create SAF trash")
+    }
+
+    private fun nativeTrashFile() =
+        File(nativeTrashDir(), "native_trash.json")
+
+    private fun safTrashFile() =
+        File(context.filesDir, "saf_trash.json")
+
+
+    private fun readTrashFile(file: File): List<TrashEntry> {
+        if (!file.exists()) return emptyList()
+
+        val arr = org.json.JSONArray(file.readText())
+        return (0 until arr.length()).mapNotNull { index ->
+            try {
+                val obj = arr.getJSONObject(index)
+                trashEntryFromMap(
+                    mapOf(
+                        "id" to obj.getString("id"),
+                        "name" to obj.getString("name"),
+                        "isSaf" to obj.getBoolean("isSaf"),
+                        "trashedAt" to obj.getLong("trashedAt"),
+                        "originalPath" to obj.optString("originalPath").takeIf { it.isNotEmpty() },
+                        "trashedPath" to obj.optString("trashedPath").takeIf { it.isNotEmpty() },
+                        "originalUri" to obj.optString("originalUri").takeIf { it.isNotEmpty() },
+                        "trashedUri" to obj.optString("trashedUri").takeIf { it.isNotEmpty() },
+                        "safRootUri" to obj.optString("safRootUri").takeIf { it.isNotEmpty() }
+                    )
+                )
+            } catch (e: Exception) {
+                Log.e("Storax", "Failed to parse trash entry", e)
+                null
+            }
+        }
+    }
+
+    @Synchronized
+    private fun writeTrashFile(file: File, entry: TrashEntry) {
+        val list = readTrashFile(file).toMutableList()
+        list.add(entry)
+
+        file.writeText(
+            org.json.JSONArray(list.map { it.toMap() }).toString()
+        )
+    }
+
+    @Synchronized
+    private fun removeTrashEntry(file: File, id: String) {
+        if (!file.exists()) return
+
+        val list = readTrashFile(file)
+            .filterNot { it.id == id }
+
+        file.writeText(
+            org.json.JSONArray(list.map { it.toMap() }).toString()
+        )
+    }
+
+
+    private fun moveNativeToTrash(path: String) {
+        val src = File(path)
+        if (!src.exists()) return
+
+        val trashDir = nativeTrashDir()
+        val trashed = File(
+            trashDir,
+            "${System.currentTimeMillis()}_${src.hashCode()}_${src.name}"
+        )
+
+        if (!src.renameTo(trashed)) {
+            src.copyRecursively(trashed, overwrite = true)
+            src.deleteRecursively()
+        }
+
+        writeNativeTrashEntry(
+            TrashEntry(
+                id = System.currentTimeMillis().toString(),
+                name = src.name,
+                isSaf = false,
+                trashedAt = System.currentTimeMillis(),
+
+                // Native
+                originalPath = src.absolutePath,
+                trashedPath = trashed.absolutePath,
+
+                // SAF (not applicable)
+                originalUri = null,
+                trashedUri = null,
+                safRootUri = null
+            )
+
+        )
+    }
+    private fun moveSafToTrash(srcUri: Uri, rootUri: Uri) {
+        val root = DocumentFile.fromTreeUri(context, rootUri)
+            ?: throw IllegalStateException("Invalid SAF root")
+
+        val src = DocumentFile.fromSingleUri(context, srcUri)
+            ?: throw IllegalStateException("Invalid source")
+
+        val trash = safTrashDir(root)
+
+        val dst = trash.createFile(src.type ?: "*/*", src.name!!)
+            ?: throw IllegalStateException("Trash create failed")
+
+        copySafStreams(src, dst)
+        deleteSafRecursive(src)
+
+        writeSafTrashEntry(
+            TrashEntry(
+                id = System.currentTimeMillis().toString(),
+                name = src.name!!,
+                isSaf = true,
+                trashedAt = System.currentTimeMillis(),
+
+                // SAF
+                originalUri = src.uri.toString(),
+                trashedUri = dst.uri.toString(),
+                safRootUri = root.uri.toString()
+            )
+
+        )
+    }
+    private fun restoreNative(entry: TrashEntry) {
+        val src = File(entry.trashedPath!!)
+        val dst = File(entry.originalPath!!)
+        dst.parentFile?.mkdirs()
+
+        if (!src.renameTo(dst)) {
+            src.copyRecursively(dst, overwrite = true)
+            src.deleteRecursively()
+        }
+
+        removeNativeTrashEntry(entry.id)
+    }
+
+    private fun emptySafTrashMetadata() {
+        safTrashFile().delete()
+    }
+
+
+    private fun restoreSaf(entry: TrashEntry) {
+        val trashedUri = entry.trashedUri
+            ?: throw IllegalStateException("Missing trashedUri for SAF restore")
+
+        val src = DocumentFile.fromSingleUri(context, trashedUri.toUri())
+            ?: return
+
+        val root = findSafRootFromOriginal(entry.originalUri!!)
+        val dstDir = resolveSafParent(root, entry.originalUri)
+
+        val dst = dstDir.createFile(src.type ?: "*/*", entry.name)
+            ?: return
+
+        copySafStreams(src, dst)
+        deleteSafRecursive(src)
+        removeSafTrashEntry(entry.id)
+    }
+
+
+    private fun copySafStreams(src: DocumentFile, dst: DocumentFile) {
+        val buffer = ByteArray(64 * 1024)
+        context.contentResolver.openInputStream(src.uri)?.use { input ->
+            context.contentResolver.openOutputStream(dst.uri)?.use { output ->
+                var read: Int
+                while (input.read(buffer).also { read = it } != -1) {
+                    output.write(buffer, 0, read)
+                }
+            }
+        }
+    }
+
+    private fun findSafRootFromOriginal(originalUri: String): Uri {
+        val uri = originalUri.toUri()
+        context.contentResolver.persistedUriPermissions.forEach {
+            if (uri.toString().startsWith(it.uri.toString())) {
+                return it.uri
+            }
+        }
+        throw IllegalStateException("SAF root not found")
+    }
+
+    private fun resolveSafParent(rootUri: Uri, originalUri: String): DocumentFile {
+        val root = DocumentFile.fromTreeUri(context, rootUri)
+            ?: throw IllegalStateException("Invalid SAF root")
+
+        val src = originalUri.toUri()
+        val docId = DocumentsContract.getDocumentId(src)
+        val path = docId.substringAfter(":")
+
+        var current = root
+        path.split("/").dropLast(1).forEach { segment ->
+            current = current.findFile(segment)
+                ?: current.createDirectory(segment)
+                        ?: throw IllegalStateException("Failed to recreate SAF folder")
+        }
+        return current
+    }
+
+    private fun writeNativeTrashEntry(entry: TrashEntry) {
+        writeTrashFile(nativeTrashFile(), entry)
+    }
+
+    private fun writeSafTrashEntry(entry: TrashEntry) {
+        writeTrashFile(safTrashFile(), entry)
+    }
+
+    private fun readNativeTrashEntries(): List<TrashEntry> =
+        readTrashFile(nativeTrashFile())
+
+    private fun readSafTrashEntries(): List<TrashEntry> =
+        readTrashFile(safTrashFile())
+
+    private fun removeNativeTrashEntry(id: String) {
+        removeTrashEntry(nativeTrashFile(), id)
+    }
+
+    private fun removeSafTrashEntry(id: String) {
+        removeTrashEntry(safTrashFile(), id)
+    }
+
+    private fun emptyNativeTrash() {
+        nativeTrashFile().delete()
+    }
+
+    private fun emptySafTrash(rootUri: Uri) {
+        val root = DocumentFile.fromTreeUri(context, rootUri) ?: return
+        val trash = root.findFile(".storax_trash") ?: return
+
+        trash.listFiles().forEach {
+            deleteSafRecursive(it)
+        }
+    }
+
+    private fun emitProgress(data: Map<String, Any?>) {
+        mainHandler.post {
+            channel.invokeMethod("onTransferProgress", data)
+        }
     }
 
 }

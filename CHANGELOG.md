@@ -1,3 +1,8 @@
+## 0.0.5
+
+* New: Added `moveToTrash`, `listTrash`, `restoreFromTrash`, `emptyTrash` methods
+* New: Added `copy`, `rename`, `createFolder`, `createFile`, `delete` methods
+
 ## 0.0.4
 
 * Fix: Limit public API visibility to prevent unintended usage

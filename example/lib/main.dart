@@ -1,10 +1,14 @@
 import 'dart:async';
-import 'package:storax/storax.dart';
 import 'package:flutter/material.dart';
+import 'package:storax/storax.dart';
 
 void main() {
   runApp(const StoraxExampleApp());
 }
+
+/* ─────────────────────────────────────────────
+ * APP
+ * ───────────────────────────────────────────── */
 
 class StoraxExampleApp extends StatelessWidget {
   const StoraxExampleApp({super.key});
@@ -36,105 +40,61 @@ class _RootsPageState extends State<RootsPage> with WidgetsBindingObserver {
   bool loading = true;
   late final StreamSubscription<StoraxEvent> _sub;
 
-  Future<void> ensureStoragePermission(
-    Storax storax,
-    BuildContext context,
-  ) async {
-    final hasAccess = await storax.hasAllFilesAccess();
-
-    if (hasAccess == true) return;
-
-    // Android 11+ All Files Access dialog
-    await storax.requestAllFilesAccess();
-    if (context.mounted) {
-      // Tell user what to do
-      await showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('Permission required'),
-          content: const Text(
-            'Please allow "All files access" for this app.\n\n'
-            'After granting permission, come back to the app.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
-    }
-  }
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _sub = storax.events.listen((event) async {
-      switch (event.type) {
-        case StoraxEventType.usbAttached:
-          await _handleUsbAttached();
-          break;
-
-        case StoraxEventType.usbDetached:
-        case StoraxEventType.safPicked:
-          await _refreshRoots();
-          break;
-      }
-    });
+    _sub = storax.events.listen(_handleEvent);
     _init();
   }
 
-  Future<void> _handleUsbAttached() async {
-    // Snapshot current native roots
-    final beforePaths = roots
-        .where((r) => r.mode == StoraxMode.native)
-        .map((r) => r.path)
-        .toSet();
-
-    // Give Android a moment to finish mounting
-    await Future.delayed(const Duration(milliseconds: 600));
-
-    final updatedRoots = await storax.getAllRoots();
-
-    final nativeUsbAppeared = updatedRoots.any((r) {
-      return r.mode == StoraxMode.native &&
-          r.path != null &&
-          !beforePaths.contains(r.path);
-    });
-
-    if (!nativeUsbAppeared && mounted) {
-      final shouldAsk = await showDialog<bool>(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('USB storage detected'),
-          content: const Text(
-            'To access files on the USB device, permission is required.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Grant access'),
-            ),
-          ],
-        ),
-      );
-
-      if (shouldAsk == true) {
-        await storax.openSafFolderPicker();
-      }
+  void _handleEvent(StoraxEvent event) async {
+    switch (event.type) {
+      case StoraxEventType.usbAttached:
+        await _refreshRoots();
+        break;
+      case StoraxEventType.usbDetached:
+      case StoraxEventType.safPicked:
+        await _refreshRoots();
+        break;
+      case StoraxEventType.transferProgress:
+        _handleTransferProgress(event);
+        break;
     }
+  }
+
+  void _handleTransferProgress(StoraxEvent event) {
+    final payload = event.payload;
+    if (payload is! Map) return;
+
+    final bool done = payload['done'] == true;
+    final String? error = payload['error'] as String?;
 
     if (!mounted) return;
-    setState(() {
-      roots = updatedRoots;
-      loading = false;
-    });
+
+    if (error != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Operation failed: $error')));
+      return;
+    }
+
+    if (done) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Operation completed')));
+      _refreshRoots();
+    }
+  }
+
+  Future<void> _init() async {
+    await _ensurePermission();
+    await _refreshRoots();
+  }
+
+  Future<void> _ensurePermission() async {
+    if (await storax.hasAllFilesAccess()) return;
+    await storax.requestAllFilesAccess();
   }
 
   Future<void> _refreshRoots() async {
@@ -146,23 +106,11 @@ class _RootsPageState extends State<RootsPage> with WidgetsBindingObserver {
     });
   }
 
-  Future<void> _init() async {
-    await ensureStoragePermission(storax, context);
-    await _refreshRoots();
-  }
-
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _sub.cancel();
     super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _init();
-    }
   }
 
   @override
@@ -172,14 +120,21 @@ class _RootsPageState extends State<RootsPage> with WidgetsBindingObserver {
         title: const Text('Storage'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.delete_outline),
+            tooltip: 'Trash',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => TrashPage()),
+              );
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.add),
             tooltip: 'Pick SAF folder',
             onPressed: () async {
               await storax.openSafFolderPicker();
-              final allRoots = await storax.getAllRoots();
-              setState(() {
-                roots = allRoots;
-              });
+              await _refreshRoots();
             },
           ),
         ],
@@ -194,29 +149,19 @@ class _RootsPageState extends State<RootsPage> with WidgetsBindingObserver {
                 return ListTile(
                   leading: Icon(isSaf ? Icons.lock : Icons.storage),
                   title: Text(r.name),
-                  isThreeLine: true,
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(isSaf ? 'SAF folder' : r.path ?? ''),
-                      isSaf
-                          ? const Text('SAF folder')
-                          : Text(
-                              '${storax.formatBytes(r.free)} free of ${storax.formatBytes(r.total)}',
-                            ),
-                    ],
-                  ),
-
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => FileBrowserPage(
-                        initialTarget: (isSaf ? r.uri : r.path) ?? '',
-                        isSaf: isSaf,
-                        title: r.name,
+                  subtitle: Text(isSaf ? 'SAF folder' : r.path ?? ''),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => FileBrowserPage(
+                          initialTarget: (isSaf ? r.uri : r.path)!,
+                          isSaf: isSaf,
+                          title: r.name,
+                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 );
               },
             ),
@@ -246,19 +191,33 @@ class FileBrowserPage extends StatefulWidget {
 
 class _FileBrowserPageState extends State<FileBrowserPage> {
   final storax = Storax();
-
   final List<String> pathStack = [];
   List<StoraxEntry> entries = [];
 
   bool gridView = true;
   String search = '';
-  SortMode sortMode = SortMode.name;
+
+  late final StreamSubscription<StoraxEvent> _sub;
 
   @override
   void initState() {
     super.initState();
     pathStack.add(widget.initialTarget);
     _load();
+
+    _sub = storax.events.listen((e) {
+      if (e.type == StoraxEventType.transferProgress &&
+          e.payload is Map &&
+          e.payload['done'] == true) {
+        _load();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _sub.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -266,250 +225,306 @@ class _FileBrowserPageState extends State<FileBrowserPage> {
       target: pathStack.last,
       isSaf: widget.isSaf,
     );
+    if (!mounted) return;
     setState(() {
-      entries = _applySearchAndSort(data);
+      entries = data
+          .where((e) => e.name.toLowerCase().contains(search.toLowerCase()))
+          .toList();
     });
   }
 
-  List<StoraxEntry> _applySearchAndSort(List<StoraxEntry> data) {
-    var out = data.where((e) {
-      return e.name.toString().toLowerCase().contains(search.toLowerCase());
-    }).toList();
+  Future<void> _createFolder() async {
+    final name = await _askText('Folder name');
+    if (name == null || name.isEmpty) return;
 
-    out.sort((a, b) {
-      switch (sortMode) {
-        case SortMode.size:
-          return (a.size).compareTo(b.size);
-        case SortMode.date:
-          return (a.lastModified).compareTo(b.lastModified);
-        case SortMode.name:
-          return a.name.compareTo(b.name);
-      }
-    });
-    return out;
+    await storax.createFolder(
+      parent: pathStack.last,
+      name: name,
+      isSaf: widget.isSaf,
+    );
+    _load();
+  }
+
+  Future<void> _createFile() async {
+    final name = await _askText('File name (example.txt)');
+    if (name == null || name.isEmpty) return;
+
+    await storax.createFile(
+      parent: pathStack.last,
+      name: name,
+      isSaf: widget.isSaf,
+    );
+    _load();
+  }
+
+  Future<String?> _askText(String title) {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(title),
+        content: TextField(controller: controller),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _open(StoraxEntry e) {
-    if (e.isDirectory == true) {
-      pathStack.add((widget.isSaf ? e.uri : e.path) ?? "");
+    if (e.isDirectory) {
+      pathStack.add((widget.isSaf ? e.uri : e.path)!);
       _load();
     } else {
-      debugPrint("Opening ${e.path} with ${e.mime}");
-      storax.openFile(path: e.path, mime: e.mime);
+      storax.openFile(path: e.path, uri: e.uri, mime: e.mime);
     }
   }
 
-  void _goBack() {
-    if (pathStack.length > 1) {
-      pathStack.removeLast();
-      _load();
-    }
+  void _showActions(StoraxEntry e) {
+    final isSaf = widget.isSaf;
+
+    showModalBottomSheet(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _action(Icons.drive_file_rename_outline, 'Rename', () async {
+              final n = await _askText('New name');
+              if (n == null) return;
+              await storax.rename(
+                target: (isSaf ? e.uri : e.path)!,
+                newName: n,
+                isSaf: isSaf,
+              );
+            }),
+            _action(Icons.copy, 'Copy', () async {
+              final dst = await _askText('Destination path');
+              if (dst == null) return;
+              await storax.copy(
+                source: (isSaf ? e.uri : e.path)!,
+                destination: dst,
+                isSaf: isSaf,
+              );
+            }),
+            _action(Icons.drive_file_move, 'Move', () async {
+              final dst = await _askText('Destination path');
+              if (dst == null) return;
+              await storax.move(
+                source: (isSaf ? e.uri : e.path)!,
+                destination: dst,
+                isSaf: isSaf,
+              );
+            }),
+            _action(Icons.delete_forever, 'Delete', () async {
+              await storax.delete(
+                target: (isSaf ? e.uri : e.path)!,
+                isSaf: isSaf,
+              );
+              _load();
+            }),
+            _action(Icons.delete, 'Move to trash', () async {
+              await storax.moveToTrash(
+                target: (isSaf ? e.uri : e.path)!,
+                isSaf: isSaf,
+                safRootUri: isSaf ? widget.initialTarget : null,
+              );
+              if (mounted) {
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text('Moved to Trash')));
+                _load();
+              }
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  ListTile _action(IconData icon, String text, VoidCallback onTap) {
+    return ListTile(
+      leading: Icon(icon),
+      title: Text(text),
+      onTap: () {
+        Navigator.pop(context);
+        onTap();
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: pathStack.length <= 1,
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
-
-        if (pathStack.length > 1) {
-          _goBack();
-        }
-      },
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(widget.title),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () {
-              if (pathStack.length > 1) {
-                _goBack();
-              } else {
-                Navigator.pop(context);
-              }
-            },
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.title),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.create_new_folder),
+            onPressed: _createFolder,
           ),
-
-          actions: [
-            IconButton(
-              icon: Icon(gridView ? Icons.list : Icons.grid_view),
-              onPressed: () => setState(() => gridView = !gridView),
-            ),
-            PopupMenuButton<SortMode>(
-              onSelected: (m) => setState(() {
-                sortMode = m;
-                entries = _applySearchAndSort(entries);
-              }),
-              itemBuilder: (_) => const [
-                PopupMenuItem(
-                  value: SortMode.name,
-                  child: Text('Sort by name'),
-                ),
-                PopupMenuItem(
-                  value: SortMode.size,
-                  child: Text('Sort by size'),
-                ),
-                PopupMenuItem(
-                  value: SortMode.date,
-                  child: Text('Sort by date'),
-                ),
-              ],
-            ),
-          ],
-        ),
-        body: Column(
-          children: [
-            _SearchBar(
-              onChanged: (v) {
-                setState(() {
-                  search = v;
-                  entries = _applySearchAndSort(entries);
-                });
+          IconButton(icon: const Icon(Icons.note_add), onPressed: _createFile),
+          IconButton(
+            icon: Icon(gridView ? Icons.list : Icons.grid_view),
+            onPressed: () => setState(() => gridView = !gridView),
+          ),
+        ],
+      ),
+      body: gridView
+          ? GridView.builder(
+              padding: const EdgeInsets.all(8),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+              ),
+              itemCount: entries.length,
+              itemBuilder: (_, i) {
+                final e = entries[i];
+                return InkWell(
+                  onTap: () => _open(e),
+                  onLongPress: () => _showActions(e),
+                  child: Column(
+                    children: [
+                      Icon(
+                        e.isDirectory ? Icons.folder : Icons.insert_drive_file,
+                        size: 48,
+                      ),
+                      Text(
+                        e.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                );
+              },
+            )
+          : ListView.builder(
+              itemCount: entries.length,
+              itemBuilder: (_, i) {
+                final e = entries[i];
+                return ListTile(
+                  leading: Icon(
+                    e.isDirectory ? Icons.folder : Icons.insert_drive_file,
+                  ),
+                  title: Text(e.name),
+                  onTap: () => _open(e),
+                  onLongPress: () => _showActions(e),
+                );
               },
             ),
-            Expanded(
-              child: gridView
-                  ? GridView.builder(
-                      padding: const EdgeInsets.all(8),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 3,
-                            childAspectRatio: .75,
-                          ),
-                      itemCount: entries.length,
-                      itemBuilder: (_, i) => _EntryTile(
-                        entry: entries[i],
-                        onTap: () => _open(entries[i]),
-                      ),
-                    )
-                  : ListView.builder(
-                      itemCount: entries.length,
-                      itemBuilder: (_, i) => _EntryListTile(
-                        entry: entries[i],
-                        onTap: () => _open(entries[i]),
-                      ),
-                    ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
 
-/* ─────────────────────────────────────────────
- * UI COMPONENTS
- * ───────────────────────────────────────────── */
-
-class _SearchBar extends StatelessWidget {
-  final ValueChanged<String> onChanged;
-
-  const _SearchBar({required this.onChanged});
+class TrashPage extends StatefulWidget {
+  const TrashPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(8),
-      child: TextField(
-        decoration: const InputDecoration(
-          prefixIcon: Icon(Icons.search),
-          hintText: 'Search files',
-        ),
-        onChanged: onChanged,
-      ),
-    );
-  }
+  State<TrashPage> createState() => _TrashPageState();
 }
 
-class _EntryTile extends StatelessWidget {
-  final StoraxEntry entry;
-  final VoidCallback onTap;
+class _TrashPageState extends State<TrashPage> {
+  final storax = Storax();
+  late Future<List<StoraxTrashEntry>> _future;
 
-  const _EntryTile({required this.entry, required this.onTap});
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  void _load() {
+    _future = storax.listTrash();
+  }
+
+  Future<void> _restore(StoraxTrashEntry e) async {
+    await storax.restoreFromTrash(e);
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Restored')));
+
+    setState(_load);
+  }
+
+  Future<void> _emptyTrash() async {
+    await storax.emptyTrash(isSaf: false);
+    await storax.emptyTrash(isSaf: true);
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Trash emptied')));
+
+    setState(_load);
+  }
+
+  String _formatDate(DateTime dt) {
+    return '${dt.day.toString().padLeft(2, '0')}-'
+        '${dt.month.toString().padLeft(2, '0')}-'
+        '${dt.year} '
+        '${dt.hour.toString().padLeft(2, '0')}:'
+        '${dt.minute.toString().padLeft(2, '0')}';
+  }
 
   @override
   Widget build(BuildContext context) {
-    final isDir = entry.isDirectory == true;
-    return InkWell(
-      onTap: onTap,
-      onLongPress: () => _showActions(context, entry),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            _iconFor(entry),
-            size: 48,
-            color: isDir ? Colors.amber : Colors.blue,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            entry.name,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Trash'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.delete_forever),
+            tooltip: 'Empty trash',
+            onPressed: _emptyTrash,
           ),
         ],
       ),
-    );
-  }
-}
+      body: FutureBuilder<List<StoraxTrashEntry>>(
+        future: _future,
+        builder: (context, snap) {
+          if (snap.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-class _EntryListTile extends StatelessWidget {
-  final StoraxEntry entry;
-  final VoidCallback onTap;
+          if (snap.hasError) {
+            return Center(child: Text('Error: ${snap.error}'));
+          }
 
-  const _EntryListTile({required this.entry, required this.onTap});
+          final items = snap.data ?? [];
+          if (items.isEmpty) {
+            return const Center(child: Text('Trash is empty'));
+          }
 
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: Icon(_iconFor(entry)),
-      title: Text(entry.name),
-      subtitle: entry.isDirectory
-          ? const Text('Folder')
-          : Text(entry.mime ?? ''),
-      onTap: onTap,
-      onLongPress: () => _showActions(context, entry),
-    );
-  }
-}
+          return ListView.builder(
+            itemCount: items.length,
+            itemBuilder: (_, i) {
+              final e = items[i];
+              return ListTile(
+                leading: const Icon(Icons.delete),
+                title: Text(e.name),
+                subtitle: Text(
+                  'Deleted at ${_formatDate(e.trashedAt)}',
+                  style: const TextStyle(fontSize: 12),
+                ),
 
-/* ─────────────────────────────────────────────
- * FILE ACTIONS (example hooks)
- * ───────────────────────────────────────────── */
-
-void _showActions(BuildContext context, StoraxEntry e) {
-  showModalBottomSheet(
-    context: context,
-    builder: (_) => SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: const [
-          ListTile(
-            leading: Icon(Icons.drive_file_rename_outline),
-            title: Text('Rename'),
-          ),
-          ListTile(leading: Icon(Icons.copy), title: Text('Copy')),
-          ListTile(leading: Icon(Icons.delete), title: Text('Delete')),
-        ],
+                trailing: IconButton(
+                  icon: const Icon(Icons.restore),
+                  onPressed: () => _restore(e),
+                ),
+              );
+            },
+          );
+        },
       ),
-    ),
-  );
+    );
+  }
 }
-
-/* ─────────────────────────────────────────────
- * UTILITIES
- * ───────────────────────────────────────────── */
-
-IconData _iconFor(StoraxEntry e) {
-  if (e.isDirectory == true) return Icons.folder;
-  final mime = e.mime ?? '';
-  if (mime.startsWith('image')) return Icons.image;
-  if (mime.startsWith('video')) return Icons.movie;
-  if (mime.startsWith('audio')) return Icons.music_note;
-  if (mime.contains('pdf')) return Icons.picture_as_pdf;
-  return Icons.insert_drive_file;
-}
-
-enum SortMode { name, size, date }

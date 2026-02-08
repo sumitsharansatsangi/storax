@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:storax/src/models/storax_oem.dart';
+import 'package:storax/src/models/storax_trash_entry.dart';
 import 'package:storax/src/models/storax_volume.dart';
 import 'package:storax/src/models/storax_entry.dart';
 import 'package:storax/src/models/storax_event.dart';
@@ -47,6 +48,15 @@ class MethodChannelStorax extends StoraxPlatform {
           ),
         );
         break;
+       case 'onTransferProgress':
+      _events.add(
+        StoraxEvent(
+          StoraxEventType.transferProgress,
+          payload: call.arguments, // ✅ Map<String, dynamic>
+        ),
+      );
+      break;
+
     }
   }
   // ─────────────────────────────────────────────
@@ -207,6 +217,131 @@ class MethodChannelStorax extends StoraxPlatform {
     return Map<String, dynamic>.from(result ?? {});
   }
 
+
+  // ─────────────────────────────────────────────
+  // File operations (NEW)
+  // ─────────────────────────────────────────────
+
+  /// Creates a new folder.
+  @override
+  Future<void> createFolder({
+    required String parent,
+    required String name,
+    required bool isSaf,
+  }) async {
+    await _channel.invokeMethod('createFolder', {
+      'parent': parent,
+      'name': name,
+      'isSaf': isSaf,
+    });
+  }
+
+  /// Creates a new file.
+  @override
+  Future<void> createFile({
+    required String parent,
+    required String name,
+    String ?mime,
+    required bool isSaf,
+  }) async {
+    await _channel.invokeMethod('createFile', {
+      'parent': parent,
+      'name': name,
+      'mime': mime,
+      'isSaf': isSaf,
+    });
+  }
+
+  /// Copy file (native or SAF).
+  /// Returns a jobId immediately.
+  @override
+  Future<String> copy({
+    required String source,
+    required String destination,
+    required bool isSaf,
+  }) async {
+    final jobId = await _channel.invokeMethod<String>('copy', {
+      'source': source,
+      'destination': destination,
+      'isSaf': isSaf,
+    });
+
+    return jobId!;
+  }
+
+  /// Move file (native or SAF).
+  /// Returns a jobId immediately.
+  @override
+  Future<String> move({
+    required String source,
+    required String destination,
+    required bool isSaf,
+  }) async {
+    final jobId = await _channel.invokeMethod<String>('move', {
+      'source': source,
+      'destination': destination,
+      'isSaf': isSaf,
+    });
+
+    return jobId!;
+  }
+
+  /// Rename file or folder.
+  @override
+  Future<void> rename({
+    required String target,
+    required String newName,
+    required bool isSaf,
+  }) async {
+    await _channel.invokeMethod('rename', {
+      'target': target,
+      'newName': newName,
+      'isSaf': isSaf,
+    });
+  }
+
+   /// Deletes a file or folder.
+  @override
+  Future<void> delete({required String target, required bool isSaf}) async {
+    await _channel.invokeMethod('delete', {'target': target, 'isSaf': isSaf});
+  }
+
+  /// Moves a file or folder to trash.
+  @override
+  Future<void> moveToTrash({
+    required String target,
+    required bool isSaf,
+    String? safRootUri,
+  }) async {
+    await _channel.invokeMethod('moveToTrash', {
+      'target': target,
+      'isSaf': isSaf,
+      'safRootUri': safRootUri,
+    });
+  }
+
+  @override
+  Future<List<StoraxTrashEntry>> listTrash() async {
+    final result = await _channel.invokeMethod<List<dynamic>>('listTrash');
+
+    return (result ?? [])
+        .map((e) => StoraxTrashEntry.fromMap(Map<String, dynamic>.from(e)))
+        .toList(growable: false);
+  }
+
+  @override
+  Future<void> restoreFromTrash(StoraxTrashEntry entry) async {
+    await _channel.invokeMethod('restoreFromTrash', {'entry': entry.toMap()});
+  }
+
+  @override
+  Future<void> emptyTrash({required bool isSaf, String? safRootUri}) async {
+    await _channel.invokeMethod('emptyTrash', {
+      'isSaf': isSaf,
+      'safRootUri': safRootUri,
+    });
+  }
+
   // ─────────────────────────────────────────────
   // Utilities
   // ─────────────────────────────────────────────
@@ -259,4 +394,7 @@ class MethodChannelStorax extends StoraxPlatform {
       'uri': uri,
     });
   }
+
+  
+
 }

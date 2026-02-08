@@ -1,8 +1,8 @@
-enum StoraxEventType { usbAttached, usbDetached, safPicked }
+enum StoraxEventType { usbAttached, usbDetached, safPicked, transferProgress }
 
 class StoraxEvent {
   final StoraxEventType type;
-  final String? payload;
+  final dynamic payload; // ✅ FIXED
 
   const StoraxEvent(this.type, {this.payload});
 }
