@@ -21,6 +21,14 @@ class Storax {
   /// Event stream
   Stream<StoraxEvent> get events => MethodChannelStorax.events;
 
+  Future<String?> getPlatformVersion() {
+    return StoraxPlatform.instance.getPlatformVersion();
+  }
+
+  Future<int?> getSDKIntVersion() {
+    return StoraxPlatform.instance.getSDKIntVersion();
+  }
+
   /// Returns native filesystem roots such as:
   /// - Internal storage
   /// - External SD card

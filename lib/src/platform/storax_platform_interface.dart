@@ -38,6 +38,21 @@ abstract class StoraxPlatform extends PlatformInterface {
     _instance = instance;
   }
 
+  /// Returns the platform version.
+  ///
+  /// For example, `Android 11`.
+
+  Future<String?> getPlatformVersion() {
+    throw UnimplementedError('platformVersion() has not been implemented.');
+  }
+
+  /// Returns the SDK version.
+  ///
+  /// For example, `30`.
+  Future<int?> getSDKIntVersion() {
+    throw UnimplementedError('getSDKIntVersion() has not been implemented.');
+  }
+
   // ─────────────────────────────────────────────
   // Storage roots
   // ─────────────────────────────────────────────

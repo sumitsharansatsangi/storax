@@ -174,7 +174,13 @@ class StoraxPlugin :
      */
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
+            "gPV" -> {
+                result.success("Android ${Build.VERSION.RELEASE}")
+            }
 
+            "gSDKV" -> {
+                result.success(Build.VERSION.SDK_INT)
+            }
             /**
              * Returns all native filesystem roots:
              * - Internal storage

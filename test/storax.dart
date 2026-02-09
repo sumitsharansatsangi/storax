@@ -16,6 +16,16 @@ class MockStoraxPlatform
     with MockPlatformInterfaceMixin
     implements StoraxPlatform {
   @override
+  Future<String?> getPlatformVersion() async {
+    return 'Android 11';
+  }
+
+  @override
+  Future<int?> getSDKIntVersion() async {
+    return 30;
+  }
+
+  @override
   Future<List<StoraxVolume>> getNativeRoots() async {
     return [
       StoraxVolume(

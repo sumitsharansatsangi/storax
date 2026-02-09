@@ -1,3 +1,7 @@
+## 0.0.6
+
+* New: Added `getPlatformVersion` and `getSDKIntVersion` methods
+
 ## 0.0.5
 
 * New: Added `moveToTrash`, `listTrash`, `restoreFromTrash`, `emptyTrash` methods

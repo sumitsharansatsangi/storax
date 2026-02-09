@@ -58,6 +58,16 @@ class MethodChannelStorax extends StoraxPlatform {
         break;
     }
   }
+
+  @override
+  Future<String?> getPlatformVersion() async {
+    return await _channel.invokeMethod<String>('gPV');
+  }
+
+  @override
+  Future<int?> getSDKIntVersion() async {
+    return await _channel.invokeMethod<int>('gSDKV');
+  }
   // ─────────────────────────────────────────────
   // Storage roots
   // ─────────────────────────────────────────────
