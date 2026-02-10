@@ -260,8 +260,25 @@ class Storax {
   /// - A file:// URI
   ///
   /// [mime] is optional and may be used to override the detected MIME type.
-  Future<void> openFile({String? path, String? mime, String? uri}) {
-    return StoraxPlatform.instance.openFile(path: path, mime: mime, uri: uri);
+ Future<void> openFile({required String path, String? mime}) {
+    String? resolvedPath;
+    String? resolvedUri;
+
+    final parsed = Uri.tryParse(path);
+
+    if (parsed != null && parsed.scheme == 'content') {
+      // SAF / shared URI
+      resolvedUri = path;
+    } else {
+      // Everything else = filesystem path
+      resolvedPath = path;
+    }
+
+    return StoraxPlatform.instance.openFile(
+      path: resolvedPath,
+      uri: resolvedUri,
+      mime: mime,
+    );
   }
 
   String formatBytes(int bytes) {

@@ -278,12 +278,12 @@ class _FileBrowserPageState extends State<FileBrowserPage> {
     );
   }
 
-  void _open(StoraxEntry e) {
+  Future<void> _open(StoraxEntry e) async{
     if (e.isDirectory) {
       pathStack.add((widget.isSaf ? e.uri : e.path)!);
       _load();
     } else {
-      storax.openFile(path: e.path, uri: e.uri, mime: e.mime);
+      await storax.openFile(path: e.path ?? e.uri?? "", mime: e.mime);
     }
   }
 
@@ -387,7 +387,7 @@ class _FileBrowserPageState extends State<FileBrowserPage> {
               itemBuilder: (_, i) {
                 final e = entries[i];
                 return InkWell(
-                  onTap: () => _open(e),
+                  onTap: ()async  => await _open(e),
                   onLongPress: () => _showActions(e),
                   child: Column(
                     children: [
@@ -414,7 +414,7 @@ class _FileBrowserPageState extends State<FileBrowserPage> {
                     e.isDirectory ? Icons.folder : Icons.insert_drive_file,
                   ),
                   title: Text(e.name),
-                  onTap: () => _open(e),
+                  onTap: ()async => await _open(e),
                   onLongPress: () => _showActions(e),
                 );
               },
